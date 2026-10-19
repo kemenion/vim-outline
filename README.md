@@ -10,6 +10,7 @@ A tiny, dependency-free Markdown outline for Vim.
 - Configurable depth and width
 - Follows the active Markdown buffer and refreshes after edits
 - Per-tab outlines
+- Compact Markdown source highlighting whose H1 matches the outline green
 - No Python, no external commands, no plugin dependencies
 
 ## Requirements
@@ -111,6 +112,56 @@ The outline follows the current buffer in each tab. Markdown headings are
 shown; non-Markdown buffers show an empty outline. Editing a heading updates
 the outline automatically after a short debounce; there is no need to run a
 command by hand.
+
+## Markdown source highlighting
+
+When this plugin comes before `$VIMRUNTIME` in `runtimepath`, its compact
+`syntax/markdown.vim` is used for Markdown buffers. It covers the syntax that is
+common in notes without loading a large external grammar:
+
+- ATX and Setext headings with level-specific colors
+- YAML front matter
+- fenced backtick/tilde code blocks, including the info-string language
+- inline code, escapes, bold, italic, bold-italic, and strikethrough
+- links, images, reference links, autolinks, bare URLs, and footnotes
+- HTML tags/entities, list and task-list markers, blockquotes, rules, and tables
+
+The H1 foreground deliberately uses a green matched to the outline's default
+`VOutlineHeading` color (`#9ece6a`), so headings in the document and in the
+outline read as one system.
+Lower levels move through teal, cyan, blue, and muted purple; delimiters and
+punctuation remain dim so body text stays dominant. The palette is a cool
+low-glare dark theme and also provides 256-color fallbacks.
+
+```vim
+" Set to 0 to fall back to Vim's built-in Markdown syntax.
+let g:v_outline_markdown_syntax = 1
+
+" Make all Markdown heading levels follow VOutlineHeading as well.
+let g:v_outline_markdown_unified_headings = 0
+
+" Optional overrides.  A value is [gui-fg, cterm-fg, attrs, gui-bg, cterm-bg];
+" only the first two entries are required.
+let g:v_outline_markdown_palette = {
+      \ 'markdownH1': ['#9ece6a', '149', 'bold'],
+      \ 'markdownCode': ['#e0af68', '179', '', '#1f2335', '235'],
+      \ }
+
+" Files up to this many lines get exact from-start synchronization.
+let g:v_outline_markdown_fromstart_limit = 5000
+
+" Bounded context for larger files; keeps scrolling cheap.
+let g:v_outline_markdown_minlines = 200
+
+" Always parse from the start (exact, but O(file size)).
+let g:v_outline_markdown_fromstart = 0
+```
+
+Large files do not parse from line 1 on every redraw: the highlighter uses
+bounded syntax synchronization with a one-line break limit. In a local Vim 9.1
+benchmark on a 100,000-line Markdown file, opening and forcing syntax parsing at
+the end of the buffer was faster than Vim's stock Markdown syntax; ordinary
+notes still use exact from-start synchronization by default.
 
 ## What is supported
 
