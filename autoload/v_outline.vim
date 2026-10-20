@@ -181,6 +181,22 @@ function! s:leave_tree(state) abort
   endif
 endfunction
 
+" The document line for the outline line under the cursor.
+function! s:heading_lnum(state) abort
+  let lnums = getbufvar(a:state.tree, 'v_outline_lnums', [])
+  return get(lnums, line('.') - 1, 0)
+endfunction
+
+" Center a document heading in window {win} without changing the current
+" window.  noautocmd keeps preview-only cursor moves out of other plugins.
+function! s:center_heading(win, lnum) abort
+  try
+    call win_execute(a:win, 'noautocmd call cursor(' . a:lnum . ', 1)')
+    call win_execute(a:win, 'noautocmd normal! zvzz')
+  catch
+  endtry
+endfunction
+
 " The absolute cursor line in the tree belongs to the previous document.
 " Put the new document's outline at the top and forget the old saved view.
 function! s:reset_tree_view(state) abort
@@ -338,7 +354,7 @@ function! s:setup(tab_key) abort
   let b:v_outline_lnums = []
   let b:v_outline_title = 'Outline'
 
-  nnoremap <buffer> <silent> <CR> :<C-u>call v_outline#jump()<CR>
+  nnoremap <buffer> <silent> <CR> :<C-u>call v_outline#preview()<CR>
   execute 'nnoremap <buffer> <silent> ' . a:tab_key
         \ . ' :<C-u>call v_outline#focus_body()<CR>'
   nnoremap <buffer> <silent> q :<C-u>call v_outline#close()<CR>
@@ -722,19 +738,24 @@ function! v_outline#on_bufwipe(buf) abort
   endfor
 endfunction
 
-" Tab is a pure window shuttle.  <CR> performs the actual heading jump.
+" Tab from the outline: jump to the heading selected in the outline.
 function! v_outline#focus_body() abort
   let state = s:state()
   if !s:is_open(state) || bufnr('%') != state.tree
     return
   endif
 
+  let lnum = s:heading_lnum(state)
   call s:leave_tree(state)
   let win = s:open_body_window(state)
   if win <= 0
     return
   endif
   call win_gotoid(win)
+  if lnum > 0
+    call cursor(min([lnum, line('$')]), 1)
+    normal! zvzz
+  endif
   call s:map_body(state)
 endfunction
 
@@ -760,27 +781,35 @@ function! v_outline#focus_tree() abort
   endif
 endfunction
 
-function! v_outline#jump() abort
+" <CR>: center the selected heading in the document, but keep the cursor in
+" the outline.  Tab then moves into the document at that heading.
+function! v_outline#preview() abort
   let state = s:state()
   if !s:is_open(state) || bufnr('%') != state.tree
     return
   endif
 
-  let lnums = getbufvar(state.tree, 'v_outline_lnums', [])
-  let lnum = get(lnums, line('.') - 1, 0)
+  let lnum = s:heading_lnum(state)
   if lnum <= 0
     return
   endif
 
-  call s:leave_tree(state)
+  let tree_win = s:tree_window(state)
   let win = s:open_body_window(state)
   if win <= 0
     return
   endif
-  call win_gotoid(win)
-  call cursor(min([lnum, line('$')]), 1)
-  normal! zvzz
-  call s:map_body(state)
+  call s:center_heading(win, lnum)
+
+  " s:open_body_window() may have created and entered a new split.
+  if tree_win > 0
+    call win_gotoid(tree_win)
+  endif
+endfunction
+
+" Kept for compatibility.  <CR> now previews instead of jumping.
+function! v_outline#jump() abort
+  call v_outline#preview()
 endfunction
 
 function! v_outline#close() abort

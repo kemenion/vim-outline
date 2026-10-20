@@ -5,8 +5,8 @@ A tiny, dependency-free Markdown outline for Vim.
 - Sidebar outline of ATX and Setext headings
 - VOoM-style level markers (`. ` and `|`) make the hierarchy easy to scan
 - Native search and navigation: `/`, `?`, `n`, `N`, `j`, `k`
-- `<CR>` jumps to the heading in the Markdown buffer
-- `<Tab>` switches between the outline and the document
+- `<CR>` centers the selected heading in the document, focus stays in the outline
+- `<Tab>` jumps to the selected heading, or switches back to the outline
 - Configurable depth and width
 - Follows the active Markdown buffer and refreshes after edits
 - Per-tab outlines
@@ -69,14 +69,15 @@ Inside the outline:
 | --- | --- |
 | `j` / `k` | Move down / up using normal Vim motions |
 | `/` `?` `n` `N` | Native Vim search |
-| `<CR>` | Jump to the heading in the Markdown buffer |
-| `<Tab>` | Switch between the outline and the document |
+| `<CR>` | Center the selected heading in the document (focus stays in the outline) |
+| `<Tab>` | Jump to the selected heading; from the document, switch back to the outline |
 | `q` | Close the outline |
 
-`<Tab>` only switches windows; it does not move the document cursor. It also
-works from the empty outline of a non-Markdown buffer. When you return from the
-document, the outline cursor and view are restored. `<CR>` remains the key that
-jumps to the selected heading.
+`<CR>` previews the heading: the document window scrolls so that the heading is
+in the middle, but the cursor stays in the outline. Press `<Tab>` to move into
+the document at that heading. `<Tab>` from the document switches back to the
+outline and restores its cursor and view. On the empty outline of a non-Markdown
+buffer, `<Tab>` only switches windows.
 
 The outline stays open when you jump. Search is plain Vim search, so
 `incsearch`, `hlsearch`, and all your normal search settings work.
@@ -90,7 +91,7 @@ let g:v_outline_depth = 3
 " Outline width in columns (minimum 10). Default: 30
 let g:v_outline_width = 30
 
-" Key used to switch between outline and document. Default: <Tab>
+" Key used to jump to the selected heading / switch back. Default: <Tab>
 let g:v_outline_tab_key = '<Tab>'
 ```
 
