@@ -16,6 +16,9 @@ endif
 if !exists('g:v_outline_tab_key')
   let g:v_outline_tab_key = '<Tab>'
 endif
+if !exists('g:v_outline_mouse')
+  let g:v_outline_mouse = 1
+endif
 
 command! -nargs=? -bar V call v_outline#toggle(<q-args>)
 command! -bar Vrefresh call v_outline#refresh()

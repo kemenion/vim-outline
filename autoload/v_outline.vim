@@ -72,8 +72,8 @@ function! s:follow(state, buf) abort
   call s:map_body(a:state)
 endfunction
 
-" Install the document-local Tab mapping.  An existing buffer-local mapping is
-" saved so it can be restored when the outline is closed.
+" Install the document-local Tab and mouse mappings.  Existing buffer-local
+" mappings are saved so they can be restored when the outline is closed.
 function! s:map_body(state) abort
   let body = get(a:state, 'body', 0)
   if body <= 0 || body != bufnr('%') || body == a:state.tree
@@ -88,47 +88,86 @@ function! s:map_body(state) abort
   endif
 
   let key = get(a:state, 'tab_key', '<Tab>')
-  if get(b:, 'v_outline_body_tab_mapped', 0)
+  let tab_mapped = get(b:, 'v_outline_body_tab_mapped', 0)
         \ && maparg(key, 'n') =~# 'v_outline#focus_tree'
+  let mouse = get(g:, 'v_outline_mouse', 1)
+  let mouse_mapped = get(b:, 'v_outline_body_mouse_mapped', 0)
+        \ && maparg('<LeftMouse>', 'n') =~# 'v_outline#on_mouse'
+  if tab_mapped && (!mouse || mouse_mapped)
     return
   endif
 
-  if !get(b:, 'v_outline_body_tab_saved', 0)
-    let saved = maparg(key, 'n', 0, 1)
-    if !empty(saved) && get(saved, 'buffer', 0)
-          \ && get(saved, 'rhs', '') !~# 'v_outline#focus_tree'
-      let b:v_outline_body_saved_tab = saved
+  if !tab_mapped
+    if !get(b:, 'v_outline_body_tab_saved', 0)
+      let saved = maparg(key, 'n', 0, 1)
+      if !empty(saved) && get(saved, 'buffer', 0)
+            \ && get(saved, 'rhs', '') !~# 'v_outline#focus_tree'
+        let b:v_outline_body_saved_tab = saved
+      endif
+      let b:v_outline_body_tab_saved = 1
     endif
-    let b:v_outline_body_tab_saved = 1
+
+    execute 'nnoremap <buffer> <silent> ' . key
+          \ . ' :<C-u>call v_outline#focus_tree()<CR>'
+    let b:v_outline_body_tab_mapped = 1
+    let b:v_outline_body_tab_key = key
   endif
 
-  execute 'nnoremap <buffer> <silent> ' . key
-        \ . ' :<C-u>call v_outline#focus_tree()<CR>'
-  let b:v_outline_body_tab_mapped = 1
-  let b:v_outline_body_tab_key = key
+  " The first click that moves the cursor from this buffer to the outline does
+  " not run the outline's buffer-local mapping.  This mapping does run, so it
+  " can preview after Vim has switched to the clicked outline window.
+  if mouse && !mouse_mapped
+    if !get(b:, 'v_outline_body_mouse_saved', 0)
+      let saved = maparg('<LeftMouse>', 'n', 0, 1)
+      if !empty(saved) && get(saved, 'buffer', 0)
+            \ && get(saved, 'rhs', '') !~# 'v_outline#on_mouse'
+        let b:v_outline_body_saved_mouse = saved
+      endif
+      let b:v_outline_body_mouse_saved = 1
+    endif
+
+    nnoremap <buffer> <silent> <LeftMouse>
+          \ <LeftMouse>:<C-u>call v_outline#on_mouse()<CR>
+    let b:v_outline_body_mouse_mapped = 1
+  endif
 endfunction
 
 function! v_outline#detach_body() abort
-  if !get(b:, 'v_outline_body_tab_mapped', 0)
-    return
-  endif
-
-  let key = get(b:, 'v_outline_body_tab_key', '<Tab>')
-  if maparg(key, 'n') =~# 'v_outline#focus_tree'
-    execute 'silent! nunmap <buffer> ' . key
-    let saved = get(b:, 'v_outline_body_saved_tab', {})
-    if !empty(saved) && exists('*mapset')
-      try
-        call mapset('n', 0, saved)
-      catch
-      endtry
+  if get(b:, 'v_outline_body_tab_mapped', 0)
+    let key = get(b:, 'v_outline_body_tab_key', '<Tab>')
+    if maparg(key, 'n') =~# 'v_outline#focus_tree'
+      execute 'silent! nunmap <buffer> ' . key
+      let saved = get(b:, 'v_outline_body_saved_tab', {})
+      if !empty(saved) && exists('*mapset')
+        try
+          call mapset('n', 0, saved)
+        catch
+        endtry
+      endif
     endif
+
+    unlet! b:v_outline_body_tab_mapped
+    unlet! b:v_outline_body_tab_key
+    unlet! b:v_outline_body_saved_tab
+    unlet! b:v_outline_body_tab_saved
   endif
 
-  unlet! b:v_outline_body_tab_mapped
-  unlet! b:v_outline_body_tab_key
-  unlet! b:v_outline_body_saved_tab
-  unlet! b:v_outline_body_tab_saved
+  if get(b:, 'v_outline_body_mouse_mapped', 0)
+    if maparg('<LeftMouse>', 'n') =~# 'v_outline#on_mouse'
+      silent! nunmap <buffer> <LeftMouse>
+      let saved = get(b:, 'v_outline_body_saved_mouse', {})
+      if !empty(saved) && exists('*mapset')
+        try
+          call mapset('n', 0, saved)
+        catch
+        endtry
+      endif
+    endif
+
+    unlet! b:v_outline_body_mouse_mapped
+    unlet! b:v_outline_body_mouse_saved
+    unlet! b:v_outline_body_saved_mouse
+  endif
 endfunction
 
 function! s:detach_body(state) abort
@@ -358,6 +397,18 @@ function! s:setup(tab_key) abort
   execute 'nnoremap <buffer> <silent> ' . a:tab_key
         \ . ' :<C-u>call v_outline#focus_body()<CR>'
   nnoremap <buffer> <silent> q :<C-u>call v_outline#close()<CR>
+
+  if get(g:, 'v_outline_mouse', 1)
+    " A mouse mapping replaces Vim's default click handling, so keep the
+    " leading <LeftMouse>: it positions the cursor before the preview runs.
+    " The document-local mapping covers the first click from another window.
+    nnoremap <buffer> <silent> <LeftMouse>
+          \ <LeftMouse>:<C-u>call v_outline#preview()<CR>
+    " Vim positions the cursor before a double-click mapping runs, so reuse
+    " the normal jump command.  <2-LeftMouse> is only generated in Normal mode.
+    nnoremap <buffer> <silent> <2-LeftMouse>
+          \ :<C-u>call v_outline#focus_body()<CR>
+  endif
 
   " All heading levels share one color; the level markers still show depth.
   let matches = []
@@ -805,6 +856,27 @@ function! v_outline#preview() abort
   if tree_win > 0
     call win_gotoid(tree_win)
   endif
+endfunction
+
+" Called from the document-local <LeftMouse> mapping.  If the click landed on
+" the outline, switch there and preview its heading.  The outline's own
+" buffer-local mapping does not run for the first click that moves the cursor
+" from another window.
+function! v_outline#on_mouse() abort
+  let state = s:state()
+  if !s:is_open(state)
+    return
+  endif
+
+  let pos = getmousepos()
+  let tree_win = s:tree_window(state)
+  if tree_win <= 0 || get(pos, 'winid', 0) != tree_win
+        \ || get(pos, 'line', 0) <= 0
+    return
+  endif
+
+  call win_gotoid(tree_win)
+  call v_outline#preview()
 endfunction
 
 " Kept for compatibility.  <CR> now previews instead of jumping.

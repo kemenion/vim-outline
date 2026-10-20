@@ -7,6 +7,7 @@ A tiny, dependency-free Markdown outline for Vim.
 - Native search and navigation: `/`, `?`, `n`, `N`, `j`, `k`
 - `<CR>` centers the selected heading in the document, focus stays in the outline
 - `<Tab>` jumps to the selected heading, or switches back to the outline
+- Mouse: click previews, double-click jumps, wheel scrolls (optional)
 - Configurable depth and width
 - Follows the active Markdown buffer and refreshes after edits
 - Per-tab outlines
@@ -18,6 +19,9 @@ A tiny, dependency-free Markdown outline for Vim.
 Vim 8.2 or newer. On Vim 9.1+ the parser uses the built-in
 `matchbufline()` C function, so only a single fast scan of the buffer is
 needed. Older versions use a Vimscript fallback.
+
+Mouse support is optional and needs Vim's `'mouse'` option; see
+[Mouse support](#mouse-support).
 
 ## Installation
 
@@ -71,6 +75,9 @@ Inside the outline:
 | `/` `?` `n` `N` | Native Vim search |
 | `<CR>` | Center the selected heading in the document (focus stays in the outline) |
 | `<Tab>` | Jump to the selected heading; from the document, switch back to the outline |
+| `<LeftMouse>` | Preview the clicked heading (requires Vim's mouse to be enabled) |
+| `<2-LeftMouse>` | Jump to the clicked heading (same as `<Tab>`) |
+| Wheel up/down | Scroll the outline under the pointer |
 | `q` | Close the outline |
 
 `<CR>` previews the heading: the document window scrolls so that the heading is
@@ -81,6 +88,45 @@ buffer, `<Tab>` only switches windows.
 
 The outline stays open when you jump. Search is plain Vim search, so
 `incsearch`, `hlsearch`, and all your normal search settings work.
+
+## Mouse support
+
+The outline responds to clicks and the wheel when Vim is allowed to receive
+mouse events. Enable the mouse in your vimrc:
+
+```vim
+set mouse=a
+" or, if you do not need mouse support on the command line:
+set mouse=nvi
+```
+
+The plugin does not change this global option itself; check the current value
+with `:set mouse?`. With the mouse enabled, a single click previews the clicked
+heading (same as `<CR>`), a double-click jumps to it (same as `<Tab>`), and the
+wheel scrolls the outline under the pointer. The click mappings are
+buffer-local: the outline has the heading mappings, and while it is open the
+document also gets a `<LeftMouse>` mapping so the first click from the document
+into the outline previews immediately. Set `g:v_outline_mouse` to `0` to
+disable the click mappings.
+
+Konsole supports the xterm mouse protocol. Vim 9.0.0273 and later recognize
+Konsole and set `'ttymouse'` to `sgr` automatically. On older versions, or if
+clicks do nothing, check `:set ttymouse?` and set it explicitly:
+
+```vim
+set ttymouse=sgr
+```
+
+Also make sure `AllowMouseTracking` is enabled in the Konsole profile (it is on
+by default). In tmux or screen, enable mouse forwarding there as well; for
+tmux:
+
+```tmux
+set -g mouse on
+```
+
+When Vim uses the mouse, hold Shift while dragging to let the terminal select
+and copy text.
 
 ## Configuration
 
@@ -93,15 +139,19 @@ let g:v_outline_width = 30
 
 " Key used to jump to the selected heading / switch back. Default: <Tab>
 let g:v_outline_tab_key = '<Tab>'
+
+" Enable mouse mappings: click previews, double-click jumps. Default: 1
+let g:v_outline_mouse = 1
 ```
 
 Changing `g:v_outline_depth` while an outline is open takes effect on the next
-refresh. Run `:Vrefresh` to force it immediately.
+refresh. Run `:Vrefresh` to force it immediately. `g:v_outline_mouse` is read
+when an outline opens; reopen the outline to apply a change.
 
-The outline/document `<Tab>` mapping is buffer-local and only active while an
-outline is open. Insert mode is not affected. If the document buffer already
-has its own buffer-local `<Tab>` mapping, it is saved and restored when the
-outline closes.
+The outline/document `<Tab>` and mouse mappings are buffer-local and only
+active while an outline is open. Insert mode is not affected. If the document
+buffer already has its own buffer-local `<Tab>` or `<LeftMouse>` mapping, it is
+saved and restored when the outline closes.
 
 All heading levels use the same color: the heading text uses the
 `VOutlineHeading` highlight group, which is linked to `Function` by default
